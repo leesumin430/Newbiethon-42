@@ -40,7 +40,8 @@ export default function App() {
   const [searchFrom, setSearchFrom] = useState("");
   const [searchTo, setSearchTo] = useState("");
   const [selectedRoute, setSelectedRoute] = useState<RouteCandidate | null>(null);
-
+  const [totalExp, setTotalExp] = useState(0);
+  
   const navigate = (s: Screen) => {
     setScreen(s);
     if (s === "home" || s === "routelist" || s === "route" || s === "transit" || s === "reward") setActiveTab("home");
@@ -95,8 +96,8 @@ export default function App() {
           {screen === "home" && <HomeScreen navigate={navigate} onSearch={handleSearch} />}
           {screen === "routelist" && <RouteListScreen navigate={navigate} from={searchFrom} to={searchTo} onSelectRoute={handleSelectRoute} />}
           {screen === "route" && <RouteScreen navigate={navigate} from={searchFrom} to={searchTo} selectedRoute={selectedRoute} />}
-          {screen === "transit" && <TransitScreen navigate={navigate} />}
-          {screen === "reward" && <RewardScreen navigate={navigate} />}
+          {screen === "transit" && <TransitScreen navigate={navigate} selectedRoute={selectedRoute} />}
+          {screen === "reward" && <RewardScreen navigate={navigate} to={searchTo} selectedRoute={selectedRoute} totalExp={totalExp}/>}
           {screen === "character" && <CharacterScreen navigate={navigate} />}
           {screen === "customize" && <CustomizeScreen navigate={navigate} />}
           {screen === "chat" && <ChatScreen navigate={navigate} />}

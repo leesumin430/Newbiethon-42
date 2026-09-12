@@ -136,7 +136,7 @@ export default function RouteScreen({ navigate, from, to, selectedRoute }: Props
                   </div>
                   <div style={{ paddingBottom: isLast ? 0 : 12, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a" }}>{station.name}역</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a" }}>{station}역</span>
                       {station.transferTo && (
                         <span style={{
                           background: "#fffde7", color: "#78350f",

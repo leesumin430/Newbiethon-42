@@ -38,15 +38,44 @@ function CongestionBar({ value }: { value: number }) {
 }
 
 // TODO: 실제 API 호출로 교체
-async function fetchRoutes(_from: string, _to: string): Promise<RouteCandidate[]> {
-  await new Promise(r => setTimeout(r, 1200));
-  // 백엔드 연결 전 placeholder
-  // 노선·역·시간·환승·혼잡도·리워드·보너스 모두 API 응답값으로 대체 예정
-  return [
-    { id: 1, time: 34, transfers: 1, lines: [], stations: [], congestion: 18, reward: null, bonus: "+50P" },
-    { id: 2, time: 28, transfers: 2, lines: [], stations: [], congestion: 54, reward: null, bonus: "+25P" },
-    { id: 3, time: 41, transfers: 0, lines: [], stations: [], congestion: 31, reward: null, bonus: "+10P" },
-  ];
+async function fetchRoutes(from: string, to: string): Promise<RouteCandidate[]> {
+  const url =
+    `http://localhost:8000/api/routes` +
+    `?start=${encodeURIComponent(from)}` +
+    `&destination=${encodeURIComponent(to)}` +
+    `&limit=3`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`경로 조회 실패: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return data.options.map((option: any, index: number) => ({
+    id: index + 1,
+
+    // 백엔드 route.duration
+    time: option.duration,
+
+    // 백엔드 route.transfers
+    transfers: option.transfers,
+
+    // 백엔드 route.lines
+    lines: option.lines ?? [],
+
+    // 백엔드 route.stations
+    stations: option.stations ?? [],
+
+    // 백엔드 congestion.score
+    congestion: option.congestion?.score ?? 0,
+
+    // 백엔드 reward
+    reward: option.reward ?? 0,
+
+    
+  }));
 }
 
 export default function RouteListScreen({ navigate, from, to, onSelectRoute }: Props) {
@@ -56,13 +85,24 @@ export default function RouteListScreen({ navigate, from, to, onSelectRoute }: P
   useEffect(() => {
     setLoading(true);
     setRoutes([]);
-    fetchRoutes(from, to).then(data => {
-      // 혼잡도 낮은 순 정렬 — 항상 강제
-      const sorted = [...data].sort((a, b) => a.congestion - b.congestion);
-      setRoutes(sorted);
-      setLoading(false);
-    });
-  }, [from, to]);
+
+    fetchRoutes(from, to)
+      .then(data => {
+        const sorted = [...data].sort(
+          (a, b) => a.congestion - b.congestion
+        );
+
+        setRoutes(sorted);
+      })
+      .catch(error => {
+        console.error("경로 조회 실패:", error);
+        setRoutes([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+  }, [from, to]); 
 
   return (
     <div style={{ minHeight: "100%", background: "linear-gradient(180deg, #fff5f5 0%, #fffdf7 60%)" }}>
@@ -199,46 +239,67 @@ export default function RouteListScreen({ navigate, from, to, onSelectRoute }: P
 
                   {/* 소요시간 + 보너스 */}
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: isTop ? "#dc143c" : "#1a1a1a", lineHeight: 1 }}>
-                      {route.time}<span style={{ fontSize: 13, fontWeight: 700 }}>분</span>
+                    <div
+                      style={{
+                        fontSize: 26,
+                        fontWeight: 900,
+                        color: isTop ? "#dc143c" : "#1a1a1a",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {route.time}
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>
+                        분
+                      </span>
                     </div>
-                    {route.bonus && (
-                      <div style={{
-                        marginTop: 4, background: "#ffd700",
-                        borderRadius: 8, padding: "2px 8px",
-                        fontSize: 11, fontWeight: 800, color: "#78350f",
-                      }}>{route.bonus} 보너스</div>
+
+                    {route.reward !== null && (
+                      <div
+                        style={{
+                          marginTop: 4,
+                          background: "#ffd700",
+                          borderRadius: 8,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          color: "#78350f",
+                        }}
+                      >
+                        +{route.reward}P 보너스
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* Stats row */}
-                <div style={{
-                  display: "flex", gap: 12, marginBottom: 10,
-                  padding: "8px 0", borderTop: "1px solid #f5f5f5",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 12 }}>🔄</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>환승 {route.transfers}회</span>
+                  {/* ★ Top row 닫기 */}
                   </div>
-                  <div style={{ width: 1, background: "#eee" }} />
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 12 }}>⏱️</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{route.time}분 소요</span>
+
+                  {/* Stats row */}
+                  <div style={{
+                    display: "flex", gap: 12, marginBottom: 10,
+                    padding: "8px 0", borderTop: "1px solid #f5f5f5",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 12 }}>🔄</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>환승 {route.transfers}회</span>
+                    </div>
+                    <div style={{ width: 1, background: "#eee" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 12 }}>⏱️</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{route.time}분 소요</span>
+                    </div>
                   </div>
-                </div>
 
-                {/* 혼잡도 바 */}
-                <CongestionBar value={route.congestion} />
+                  {/* 혼잡도 바 */}
+                  <CongestionBar value={route.congestion} />
 
-                {/* 선택 화살표 */}
-                <div style={{
-                  position: "absolute", right: 16, bottom: 16,
-                  width: 28, height: 28, borderRadius: "50%",
-                  background: isTop ? "#dc143c" : "#f5f5f5",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, color: isTop ? "#fff" : "#aaa",
-                }}>›</div>
+                  {/* 선택 화살표 */}
+                  <div style={{
+                    position: "absolute", right: 16, bottom: 16,
+                    width: 28, height: 28, borderRadius: "50%",
+                    background: isTop ? "#dc143c" : "#f5f5f5",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, color: isTop ? "#fff" : "#aaa",
+                  }}>›</div>
               </button>
             );
           })}
