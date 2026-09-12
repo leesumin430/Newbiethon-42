@@ -40,7 +40,7 @@ function CongestionBar({ value }: { value: number }) {
 // TODO: 실제 API 호출로 교체
 async function fetchRoutes(from: string, to: string): Promise<RouteCandidate[]> {
   const url =
-    `http://localhost:8000/api/routes` +
+    `https://newbiethon-42.onrender.com/` +
     `?start=${encodeURIComponent(from)}` +
     `&destination=${encodeURIComponent(to)}` +
     `&limit=3`;
