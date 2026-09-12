@@ -32,7 +32,12 @@ import os
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
+# backend/.env 를 읽어 환경변수로 올린다.
+# 이 파일 기준으로 경로를 잡아야 어느 디렉터리에서 실행하든 동작한다.
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent / ".env")
 KAKAO_API_BASE = "https://dapi.kakao.com"
 SUBWAY_CATEGORY_CODE = "SW8"  # 카카오 로컬 카테고리 그룹 코드: 지하철역
 
