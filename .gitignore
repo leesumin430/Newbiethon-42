@@ -5,3 +5,7 @@ __pycache__/
 *.pyc
 node_modules/
 .DS_Store
+__pycache__/
+*.pyc
+backend/data/*.csv
+backend/data/*.json
