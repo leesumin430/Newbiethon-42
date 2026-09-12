@@ -18,15 +18,13 @@ FastAPI 뼈대이자 세 사람의 코드가 만나는 유일한 지점.
             v
     [1번] route_service
           resolve_station()  -> 오타 보정 / 후보 제안
-          get_route()        -> stations / duration / transfers
-                                + transfer_stations / segments
+          get_routes()       -> stations / duration / transfers
+                                + transfer_stations / segments / station_times
             |
             v
     [2번] integration.py (어댑터)
-          get_congestion()   -> score / level / worst_segment
-          calculate_reward() -> 포인트
+          rank_routes()      -> 혼잡도순 정렬 + 순위 보너스
           recommend()        -> 추천 문장
-          rank_routes()      -> 경로 비교 + 순위 보너스
             |
             v
     [3번 Frontend]  {"route":..., "congestion":..., "recommendation":..., "reward":...}
@@ -124,6 +122,56 @@ def _call_reward_detail(
     return []
 
 
+# --------------------------------------------------------------------------
+# 경로 채점 — /trip 과 /api/routes 가 같은 로직을 쓰게 하는 지점
+# --------------------------------------------------------------------------
+#
+# 예전에는 /trip 이 경로 하나만 따로 채점했다. 그러면
+#   * 순위 보너스(50/25/10)가 빠지고
+#   * EQUALIZE_DISTANCE 기준 역 수가 달라져서
+# 같은 경로인데 비교 화면과 결과 화면의 포인트가 어긋났다.
+# 이제 두 엔드포인트 모두 rank_routes 를 거친다.
+
+CANDIDATE_LIMIT = 3  # /trip 이 내부적으로 비교할 후보 경로 수
+
+# 2번이 경로 dict 에 덧붙이는 키들. route 로 넘길 때는 떼어낸다.
+_SCORE_KEYS = ("congestion", "rank", "reward", "reward_breakdown", "recommended")
+
+
+def _rank(found: list[dict[str, Any]], when: str) -> list[dict[str, Any]]:
+    """후보 경로를 혼잡도 낮은 순으로 정렬하고 리워드를 붙인다."""
+    try:
+        ranked = congestion_service.rank_routes(found, when)
+        if ranked:
+            return ranked
+    except Exception:
+        logger.exception("rank_routes 실패 — 개별 채점으로 대체")
+
+    # 어댑터가 죽어도 응답은 나가야 한다.
+    fallback: list[dict[str, Any]] = []
+    for i, raw in enumerate(found):
+        item = dict(raw)
+        congestion = _call_congestion(item.get("stations", []), when)
+        item["congestion"] = congestion
+        item["rank"] = i + 1
+        item["reward"] = _call_reward(congestion, item)
+        item["reward_breakdown"] = _call_reward_detail(congestion, item)
+        item["recommended"] = i == 0
+        fallback.append(item)
+    return fallback
+
+
+def _split_scored(
+    item: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], int, list[dict[str, Any]]]:
+    """채점된 항목을 (route, congestion, reward, breakdown) 으로 분리한다."""
+    route = {k: v for k, v in item.items() if k not in _SCORE_KEYS}
+    congestion = item.get("congestion") or dict(_FALLBACK_CONGESTION)
+    reward = int(item.get("reward", _FALLBACK_REWARD))
+    breakdown = item.get("reward_breakdown") or []
+    return route, congestion, reward, breakdown
+
+
 # ==========================================================================
 # 요청 / 응답 스키마
 # ==========================================================================
@@ -158,7 +206,16 @@ class RouteOut(BaseModel):
     )
     segments: list[dict[str, Any]] = Field(
         default=[],
-        description="노선별 구간. 각 항목: line / from / to / stations / count",
+        description="노선별 구간. 각 항목: line / from / to / stations / count / time",
+    )
+
+    # --- 이동 애니메이션용 ---
+    station_times: list[dict[str, Any]] = Field(
+        default=[],
+        description="역별 도착 시각. [{station, at(초), line}]. at은 탑승 시점부터 경과 초.",
+    )
+    ride_seconds: int = Field(
+        default=0, description="첫 역에서 마지막 역까지 실제 승차 시간(초)"
     )
 
     # --- 부가 필드 ---
@@ -180,6 +237,9 @@ class TripResponse(BaseModel):
     corrections: list[CorrectionOut] = Field(
         default=[],
         description="오타 보정 내역. 비어 있지 않으면 화면에 '~로 검색했습니다' 안내 권장.",
+    )
+    alternatives: int = Field(
+        default=0, description="채택되지 않은 다른 후보 경로 수. /api/routes 로 볼 수 있다."
     )
     time: str
 
@@ -203,7 +263,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="역 리워드 길찾기 API",
     description="출발역/도착역으로 경로·혼잡도·추천·리워드를 반환합니다.",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -262,8 +322,9 @@ async def trip(req: TripRequest) -> TripResponse:
     응답:
         {"route": {...}, "congestion": {...}, "recommendation": "...", "reward": 150}
 
+    후보 경로를 내부적으로 비교해 가장 한산한 경로를 돌려준다.
+    /api/routes 와 같은 채점 로직을 쓰므로 두 화면의 포인트가 일치한다.
     오타는 자동 보정되며, 보정이 일어나면 corrections 에 기록된다.
-    역을 아예 못 찾으면 404 + detail.suggestions 로 후보를 돌려준다.
     """
     when = req.time or datetime.now().strftime("%H:%M")
 
@@ -280,18 +341,25 @@ async def trip(req: TripRequest) -> TripResponse:
         if info["corrected"]
     ]
 
-    # 1번 영역 — 경로 조회
+    # 1번 영역 — 후보 경로 조회
     # 확정된 이름으로 부르므로 내부 재검색은 캐시에서 처리된다.
     try:
-        route = await route_service.get_route(start_info["matched"], end_info["matched"])
+        found = await route_service.get_routes(
+            start_info["matched"], end_info["matched"], limit=CANDIDATE_LIMIT
+        )
     except RouteError as exc:
         raise _to_http_error(exc) from exc
 
-    # 2번 영역
-    congestion = _call_congestion(route["stations"], when)
-    reward = _call_reward(congestion, route)
+    if not found:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "해당 구간의 경로를 찾지 못했습니다.", "suggestions": []},
+        )
+
+    # 2번 영역 — 채점 후 1위(가장 한산한 경로) 채택
+    scored = _rank(found, when)
+    route, congestion, reward, breakdown = _split_scored(scored[0])
     recommendation = _call_agent(route, congestion)
-    breakdown = _call_reward_detail(congestion, route)
 
     return TripResponse(
         route=RouteOut(**route),
@@ -300,6 +368,7 @@ async def trip(req: TripRequest) -> TripResponse:
         reward=reward,
         reward_breakdown=breakdown,
         corrections=corrections,
+        alternatives=len(scored) - 1,
         time=when,
     )
 
@@ -327,8 +396,6 @@ async def station_resolve(
     """
     입력값이 유효한 역인지 확인하고, 오타면 보정해서 돌려준다.
     입력창에서 포커스가 빠질 때 호출하면 '사담 → 사당으로 검색합니다' 안내를 띄울 수 있다.
-
-    못 찾으면 404 + detail.suggestions 로 후보를 돌려준다.
     """
     try:
         return await route_service.resolve_station(q)
@@ -353,7 +420,7 @@ async def routes(
     '한산한 경로를 고르면 포인트를 더 준다'는 서비스 핵심이 여기서 나온다.
 
     options 각 항목은 flat 구조다 (route 로 한 번 더 감싸지 않는다):
-        stations, duration, transfers, transfer_stations, segments, lines, fare, ...
+        stations, duration, transfers, transfer_stations, segments, station_times, ...
         congestion  {"score", "level", "worst_segment"}
         rank        1위부터
         reward      최종 포인트
@@ -366,12 +433,7 @@ async def routes(
         raise _to_http_error(exc) from exc
 
     when = datetime.now().strftime("%H:%M")
-
-    try:
-        ranked = congestion_service.rank_routes(found, when)
-    except Exception:
-        logger.exception("rank_routes 실패 — 정렬/보너스 없이 반환")
-        ranked = found
+    ranked = _rank(found, when)
 
     if not include_path:
         for item in ranked:

@@ -68,13 +68,19 @@ async function fetchRoutes(from: string, to: string): Promise<RouteCandidate[]> 
     // 백엔드 route.stations
     stations: option.stations ?? [],
 
+    // 백엔드 route.transfer_stations
+    transfer_stations: option.transfer_stations ?? [],
+
     // 백엔드 congestion.score
     congestion: option.congestion?.score ?? 0,
 
     // 백엔드 reward
     reward: option.reward ?? 0,
+    reward_breakdown: option.reward_breakdown ?? [],
 
-    
+    bonus : null,
+
+
   }));
 }
 
@@ -102,7 +108,7 @@ export default function RouteListScreen({ navigate, from, to, onSelectRoute }: P
         setLoading(false);
       });
 
-  }, [from, to]); 
+  }, [from, to]);
 
   return (
     <div style={{ minHeight: "100%", background: "linear-gradient(180deg, #fff5f5 0%, #fffdf7 60%)" }}>
@@ -271,35 +277,73 @@ export default function RouteListScreen({ navigate, from, to, onSelectRoute }: P
                   </div>
 
                   {/* ★ Top row 닫기 */}
-                  </div>
+                </div>
 
-                  {/* Stats row */}
-                  <div style={{
-                    display: "flex", gap: 12, marginBottom: 10,
-                    padding: "8px 0", borderTop: "1px solid #f5f5f5",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: 12 }}>🔄</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>환승 {route.transfers}회</span>
+                {/* Stats row */}
+                <div style={{
+                  display: "flex", gap: 12, marginBottom: 10,
+                  padding: "8px 0", borderTop: "1px solid #f5f5f5",
+                }}>
+                  {route.transfer_stations && route.transfer_stations.length > 0 && (
+                    <div
+                      style={{
+                        marginBottom: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#888",
+                        }}
+                      >
+                        환승역
+                      </span>
+
+                      {route.transfer_stations.map((station, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            background: "#fff7ed",
+                            color: "#f59e0b",
+                            border: "1px solid #fcd34d",
+                            borderRadius: 7,
+                            padding: "2px 7px",
+                            fontSize: 10,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {station}
+                        </span>
+                      ))}
                     </div>
-                    <div style={{ width: 1, background: "#eee" }} />
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: 12 }}>⏱️</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{route.time}분 소요</span>
-                    </div>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>🔄</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>환승 {route.transfers}회</span>
                   </div>
+                  <div style={{ width: 1, background: "#eee" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>⏱️</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{route.time}분 소요</span>
+                  </div>
+                </div>
 
-                  {/* 혼잡도 바 */}
-                  <CongestionBar value={route.congestion} />
+                {/* 혼잡도 바 */}
+                <CongestionBar value={route.congestion} />
 
-                  {/* 선택 화살표 */}
-                  <div style={{
-                    position: "absolute", right: 16, bottom: 16,
-                    width: 28, height: 28, borderRadius: "50%",
-                    background: isTop ? "#dc143c" : "#f5f5f5",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, color: isTop ? "#fff" : "#aaa",
-                  }}>›</div>
+                {/* 선택 화살표 */}
+                <div style={{
+                  position: "absolute", right: 16, bottom: 16,
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: isTop ? "#dc143c" : "#f5f5f5",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, color: isTop ? "#fff" : "#aaa",
+                }}>›</div>
               </button>
             );
           })}

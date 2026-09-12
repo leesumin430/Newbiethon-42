@@ -165,14 +165,14 @@ export default function TransitScreen({ navigate, selectedRoute }: Props) {
                         i === currentIdx
                           ? "3px solid #fff"
                           : isTransfer
-                          ? "3px solid #fff"
-                          : "2px solid transparent",
+                            ? "3px solid #fff"
+                            : "2px solid transparent",
                       boxShadow:
                         i === currentIdx
                           ? "0 0 0 4px rgba(220,20,60,0.35)"
                           : isTransfer
-                          ? "0 0 0 2px #f59e0b"
-                          : "none",
+                            ? "0 0 0 2px #f59e0b"
+                            : "none",
                       zIndex: 2,
                       flexShrink: 0,
                     }}
@@ -196,6 +196,27 @@ export default function TransitScreen({ navigate, selectedRoute }: Props) {
                   >
                     {name}
                   </span>
+
+                  {/*환승역 표시 */}
+                  {isTransfer && (
+                    <span
+                      style={{
+                        marginTop: 3,
+                        fontSize: 8,
+                        fontWeight: 800,
+                        color: "#f59e0b",
+                        background: "#fff7ed",
+                        border: "1px solid #f59e0b",
+                        borderRadius: 6,
+                        padding: "1px 4px",
+                        lineHeight: 1.2,
+                        zIndex: 2,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      환승
+                    </span>
+                  )}
 
                   {/* 가로 연결선 */}
                   {hasNext && !rowEnd && (

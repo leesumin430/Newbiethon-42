@@ -12,65 +12,32 @@ export default function RewardScreen({
   navigate,
   to,
   selectedRoute,
-  totalExp,
 }: Props) {
-  // 레벨별 누적 필요 포인트
-  const levelThresholds = [
-    0,      // Lv.1
-    3500,   // Lv.2
-    8400,   // Lv.3
-    14400,  // Lv.4
-    21400,  // Lv.5
-    29100,  // Lv.6
-    37500,  // Lv.7
-    46600,  // Lv.8
-    56800,  // Lv.9
-    68000,  // Lv.10
-  ];
+  // ============================================================
+  // 임시 가상 사용자 데이터
+  // 실제 사용자 데이터 연동 후 이 부분만 API 값으로 교체
+  // ============================================================
+  const mockUser = {
+    level: 2,
+    name: "호랑이",
+    exp: 1300,
+    nextLevelExp: 3500,
+  };
 
-  // 현재 레벨 계산
-  let currentLevelIndex = 0;
+  const currentLevel = mockUser.level;
+  const currentExp = mockUser.exp;
+  const nextThreshold = mockUser.nextLevelExp;
 
-  for (let i = 0; i < levelThresholds.length; i++) {
-    if (totalExp >= levelThresholds[i]) {
-      currentLevelIndex = i;
-    }
-  }
+  const progress = Math.min(
+    (currentExp / nextThreshold) * 100,
+    100
+  );
 
-  const currentLevel = currentLevelIndex + 1;
-  const currentThreshold = levelThresholds[currentLevelIndex];
-  const nextThreshold = levelThresholds[currentLevelIndex + 1];
-
-  // 현재 레벨 구간 진행률
-  const progress =
-    nextThreshold !== undefined
-      ? ((totalExp - currentThreshold) /
-          (nextThreshold - currentThreshold)) *
-        100
-      : 100;
-
-  const rewards = [
-    {
-      label: "기본 이동 리워드",
-      amount: 200,
-      color: "#dc143c",
-      emoji: "🚇",
-    },
-    {
-      label: "혼잡도 보너스",
-      amount: 80,
-      color: "#f59e0b",
-      emoji: "🌟",
-    },
-    {
-      label: "추가 보너스",
-      amount: 40,
-      color: "#22c55e",
-      emoji: "🎁",
-    },
-  ];
-
-  const total = rewards.reduce((s, r) => s + r.amount, 0);
+  // ============================================================
+  // 백엔드 리워드 데이터
+  // ============================================================
+  const rewards = selectedRoute?.reward_breakdown ?? [];
+  const total = selectedRoute?.reward ?? 0;
 
   return (
     <div
@@ -81,7 +48,12 @@ export default function RewardScreen({
       }}
     >
       {/* 도착 정보 */}
-      <div style={{ padding: "52px 20px 0", textAlign: "center" }}>
+      <div
+        style={{
+          padding: "52px 20px 0",
+          textAlign: "center",
+        }}
+      >
         <div
           style={{
             display: "inline-block",
@@ -148,7 +120,12 @@ export default function RewardScreen({
             border: "1.5px solid #ffe0e0",
           }}
         >
-          <div style={{ padding: "16px 20px 8px" }}>
+          {/* 보상 제목 */}
+          <div
+            style={{
+              padding: "16px 20px 8px",
+            }}
+          >
             <p
               style={{
                 margin: 0,
@@ -161,64 +138,95 @@ export default function RewardScreen({
             </p>
           </div>
 
-          {rewards.map((r, i) => (
-            <div
-              key={r.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 20px",
-                borderTop:
-                  i === 0 ? "1px solid #ffe0e0" : "none",
-                borderBottom: "1px solid #fff5f5",
-              }}
-            >
+          {/* 리워드 상세 */}
+          {rewards.map((r, i) => {
+            const isMove = r.label.startsWith("이동");
+            const isTime = r.label === "비혼잡 시간대";
+            const isRank = r.label.startsWith("한산한 경로");
+
+            const color = isMove
+              ? "#dc143c"
+              : isTime
+                ? "#f59e0b"
+                : "#22c55e";
+
+            const emoji = isMove
+              ? "🚇"
+              : isTime
+                ? "🌟"
+                : "🎁";
+
+            const displayLabel = isMove
+              ? "기본 이동 리워드"
+              : isTime
+                ? "시간대 보너스"
+                : isRank
+                  ? "한산한 경로 보너스"
+                  : r.label;
+
+            return (
               <div
+                key={`${r.label}-${i}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
+                  justifyContent: "space-between",
+                  padding: "12px 20px",
+                  borderTop:
+                    i === 0
+                      ? "1px solid #ffe0e0"
+                      : "none",
+                  borderBottom:
+                    "1px solid #fff5f5",
                 }}
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: `${r.color}18`,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
+                    gap: 10,
                   }}
                 >
-                  {r.emoji}
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: `${color}18`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                    }}
+                  >
+                    {emoji}
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#374151",
+                    }}
+                  >
+                    {displayLabel}
+                  </span>
                 </div>
 
                 <span
                   style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#374151",
+                    fontSize: 15,
+                    fontWeight: 900,
+                    color,
                   }}
                 >
-                  {r.label}
+                  +{r.point}P
                 </span>
               </div>
+            );
+          })}
 
-              <span
-                style={{
-                  fontSize: 15,
-                  fontWeight: 900,
-                  color: r.color,
-                }}
-              >
-                +{r.amount}P
-              </span>
-            </div>
-          ))}
-
+          {/* 총 획득 리워드 */}
           <div
             style={{
               padding: "16px 20px",
@@ -253,46 +261,79 @@ export default function RewardScreen({
       </div>
 
       {/* 캐릭터 성장 */}
-      <div style={{ padding: "0 20px 16px" }}>
+      <div
+        style={{
+          padding: "0 20px 16px",
+        }}
+      >
         <div
           style={{
             background: "#fff",
             borderRadius: 20,
             padding: "16px 20px",
-            boxShadow: "0 4px 16px rgba(220,20,60,0.08)",
+            boxShadow:
+              "0 4px 16px rgba(220,20,60,0.08)",
             border: "1.5px solid #ffe0e0",
           }}
         >
+          {/* 레벨 / 이름 */}
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 10,
+              gap: 10,
+              marginBottom: 12,
             }}
           >
+            <div
+              style={{
+                background:
+                  "linear-gradient(135deg, #dc143c, #ff4560)",
+                color: "#fff",
+                borderRadius: 12,
+                padding: "6px 12px",
+                fontSize: 14,
+                fontWeight: 900,
+              }}
+            >
+              Lv.{currentLevel}
+            </div>
+
             <span
               style={{
-                fontSize: 13,
-                fontWeight: 800,
+                fontSize: 18,
+                fontWeight: 900,
                 color: "#1a1a1a",
               }}
             >
-              캐릭터 성장
+              {mockUser.name}
             </span>
 
             <span
               style={{
-                fontSize: 12,
+                fontSize: 18,
+              }}
+            >
+              🐯
+            </span>
+          </div>
+
+          {/* EXP */}
+          <div
+            style={{
+              marginBottom: 10,
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 14,
                 color: "#dc143c",
                 fontWeight: 700,
               }}
             >
-              {currentLevel < 10
-                ? `Lv.${currentLevel} → Lv.${
-                    currentLevel + 1
-                  }까지 ${Math.round(progress)}%`
-                : "Lv.10 MAX"}
+              EXP {currentExp.toLocaleString()} /{" "}
+              {nextThreshold.toLocaleString()}
             </span>
           </div>
 
@@ -317,12 +358,11 @@ export default function RewardScreen({
             />
           </div>
 
-          {/* 누적 포인트 */}
+          {/* 진행률 */}
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 6,
+              marginTop: 7,
+              textAlign: "right",
             }}
           >
             <span
@@ -332,19 +372,8 @@ export default function RewardScreen({
                 fontWeight: 600,
               }}
             >
-              누적 {totalExp.toLocaleString()}P
-            </span>
-
-            <span
-              style={{
-                fontSize: 11,
-                color: "#aaa",
-                fontWeight: 600,
-              }}
-            >
-              {nextThreshold !== undefined
-                ? `${nextThreshold.toLocaleString()}P`
-                : "MAX"}
+              Lv.{currentLevel + 1}까지{" "}
+              {Math.round(progress)}%
             </span>
           </div>
         </div>
@@ -372,7 +401,8 @@ export default function RewardScreen({
             fontWeight: 800,
             fontFamily: "Nunito, sans-serif",
             cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(220,20,60,0.3)",
+            boxShadow:
+              "0 4px 16px rgba(220,20,60,0.3)",
           }}
         >
           🐯 캐릭터 보러가기

@@ -23,15 +23,22 @@ export interface RouteStation {
   line: string;        // 해당 구간 노선
 }
 
+export interface RewardBreakdownItem {
+  label: string;
+  point: number;
+}
+
 export interface RouteCandidate {
   id: number;
   time: number;           // 소요시간(분) — API
   transfers: number;      // 환승 횟수 — API
   lines: string[];        // 이용 노선 목록 — API
-  stations: RouteStation[]; // 경유 역 목록 — API
+  stations: string[]; // 경유 역 목록 — API
   congestion: number;     // 혼잡도 0~100 — API
   reward: number | null;  // 예상 리워드(P) — 서버 로직
+  reward_breakdown: RewardBreakdownItem[];
   bonus: string | null;   // 보너스 포인트 표시 — 서버 로직
+  transfer_stations?: string[]; //환승 역 표시
 }
 
 export default function App() {
