@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Screen, RouteCandidate } from "../App";
+import { apiFetch } from "../lib/api";
 // RouteStation은 stations 필드 타입으로만 사용됨
 
 interface Props {
@@ -37,20 +38,14 @@ function CongestionBar({ value }: { value: number }) {
   );
 }
 
-// TODO: 실제 API 호출로 교체
 async function fetchRoutes(from: string, to: string): Promise<RouteCandidate[]> {
-  const url =
-    `http://localhost:8000/api/routes` +
+  const path =
+    `/api/routes` +
     `?start=${encodeURIComponent(from)}` +
     `&destination=${encodeURIComponent(to)}` +
     `&limit=3`;
 
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`경로 조회 실패: ${response.status}`);
-  }
-
+  const response = await apiFetch(path);
   const data = await response.json();
 
   return data.options.map((option: any, index: number) => ({
